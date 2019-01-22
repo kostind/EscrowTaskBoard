@@ -28,12 +28,11 @@ contract EscrowTaskBoard is AragonApp {
     }
 
     struct Task {
-        bytes32 name;
+        address creator;
         string description;
         address token;
-        uint256 amount;
         uint256 expirationTime;
-        address creator;
+        uint256 amount;
         address worker;
         address arbiter; //TODO contract owner could be used
         address[] bidders;
@@ -57,10 +56,27 @@ contract EscrowTaskBoard is AragonApp {
     }
 
     function createTask(bytes32 _name, string _description, address _token, uint256 _expirationTime) {
+        require(_name != bytes32(0), "Invalid name");
+        require(bytes(_description).length > 0, "Invalid description");
+        require(_token != address(0), "Invalid token");
+        require(_expirationTime > now, "Expiration time should be in the future");
+        require(tasks[_name].creator == address(0), "Task already exists");
 
+        Task memory task;
+        task.creator = msg.sender;
+        task.description =_description;
+        task.token = _token;
+        task.expirationTime = _expirationTime;
+        task.state = State.Created;
+        tasks[_name] = task;
+        taskNames.push(_name);
     }
 
     function cancelTask(bytes32 _name) {
+
+    }
+
+    function markAsExpired(bytes32 _name) {
 
     }
 
