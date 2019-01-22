@@ -8,23 +8,23 @@ contract EscrowTaskBoard is AragonApp {
 
     enum State {
         //task has been created
-        Created,
+        CREATED,
         //task has been canceled by creator
-        Canceled,
+        CANCELED,
         //bid has been accepted by creator -> task has been started
-        Started,
+        STARTED,
         //task has been finished by worker
-        Finished,
+        FINISHED,
         //task has been accepted by creator -> amount of token has been sent to worker
-        Accepted,
+        ACCEPTED,
         //task has been rejected by creator -> arbiter should decide what to do
-        Rejected,
+        REJECTED,
         //task has been accepted by arbiter -> amount of token has been sent to worker
-        Arbiter_Accepted,
+        ARBITER_ACCEPTED,
         //task has been rejected by arbiter -> amount of token has been sent to creator
-        Arbiter_Rejected,
+        ARBITER_REJECTED,
         //task has been expired: creator hasn't selected bid or worker hasn't marked task as finished
-        Expired
+        EXPIRED
     }
 
     struct Task {
@@ -67,7 +67,7 @@ contract EscrowTaskBoard is AragonApp {
         task.description =_description;
         task.token = _token;
         task.expirationTime = _expirationTime;
-        task.state = State.Created;
+        task.state = State.CREATED;
         tasks[_name] = task;
         taskNames.push(_name);
     }
