@@ -10,8 +10,6 @@ contract EscrowTaskBoard is AragonApp {
         //task has been created
         CREATED,
         //task has been canceled by creator
-        CANCELED,
-        //bid has been accepted by creator -> task has been started
         STARTED,
         //task has been finished by worker
         FINISHED,
@@ -38,6 +36,7 @@ contract EscrowTaskBoard is AragonApp {
         address[] bidders;
         mapping (address => Bid) bids;
         State state;
+        uint256 index;
     }
 
     struct Bid {
@@ -50,6 +49,16 @@ contract EscrowTaskBoard is AragonApp {
 
     mapping(bytes32 => Task) tasks;
 
+    modifier isExist(bytes32 _name) {
+        require(tasks[_name].creator != address(0), "Task not found");
+        _;
+    }
+
+    event TaskCreated(bytes32 indexed _name, string _description, address _token, uint256 _expirationTime, address creator);
+    event TaskRemoved(bytes32 _name);
+
+
+    //TODO add more events
 
     function initialize() public onlyInit {
         initialized();
@@ -68,51 +77,66 @@ contract EscrowTaskBoard is AragonApp {
         task.token = _token;
         task.expirationTime = _expirationTime;
         task.state = State.CREATED;
+        task.index = taskNames.length;
         tasks[_name] = task;
         taskNames.push(_name);
+
+        emit TaskCreated(_name, _description, _token, _expirationTime, msg.sender);
     }
 
-    function cancelTask(bytes32 _name) {
+    function removeTask(bytes32 _name) isExist(_name) {
+        require(tasks[_name].creator == msg.sender, "Only creator can cancel a task");
+        require(tasks[_name].state == State.CREATED, "Already started task can't be canceled");
 
+        uint256 index = tasks[_name].index;
+        if (index != taskNames.length - 1) {
+            taskNames[index] = taskNames[taskNames.length - 1];
+            tasks[taskNames[index]].index = index;
+        }
+        taskNames.length--;
+        delete tasks[_name];
+
+        emit TaskRemoved(_name);
     }
 
-    function markAsExpired(bytes32 _name) {
-
-    }
-
-    function placeBid(bytes32 _taskName, uint256 _price, string _description) {
-
-    }
-
-    function selectBid(bytes32 _taskName, address bidder) {
-
-    }
-
-    function finishTask(bytes32 _taskName) {
-
-    }
-
-    function acceptTaskByCreator(bytes32 _taskName) {
+    function markAsExpired(bytes32 _name) isExist(_name) {
 
     }
 
-    function rejectTaskByCreator(bytes32 _taskName) {
+    function placeBid(bytes32 _taskName, uint256 _price, string _description) isExist(_name) {
+
 
     }
 
-    function acceptTaskByArbiter(bytes32 _taskName) {
+    function selectBid(bytes32 _taskName, address bidder) isExist(_name) {
 
     }
 
-    function rejectTaskByArbiter(bytes32 _taskName) {
+    function finishTask(bytes32 _taskName) isExist(_name) {
 
     }
 
-    function getBidders(bytes32 _taskName) returns (address[]) {
+    function acceptTaskByCreator(bytes32 _taskName) isExist(_name) {
 
     }
 
-    function getBid(bytes32 _taskName) returns (address, uint256, string, uint256) {
+    function rejectTaskByCreator(bytes32 _taskName) isExist(_name) {
+
+    }
+
+    function acceptTaskByArbiter(bytes32 _taskName) isExist(_name) {
+
+    }
+
+    function rejectTaskByArbiter(bytes32 _taskName) isExist(_name) {
+
+    }
+
+    function getBidders(bytes32 _taskName) isExist(_name) returns (address[]) {
+
+    }
+
+    function getBid(bytes32 _taskName, address bidder) isExist(_name) returns (address, uint256, string, uint256) {
 
     }
 
