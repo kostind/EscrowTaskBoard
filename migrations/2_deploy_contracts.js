@@ -1,5 +1,5 @@
-var App = artifacts.require('./App.sol')
+var EscrowTaskBoard = artifacts.require('./EscrowTaskBoard.sol')
 
 module.exports = function (deployer) {
-  deployer.deploy(App)
+  deployer.deploy(EscrowTaskBoard)
 }
