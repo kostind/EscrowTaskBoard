@@ -103,40 +103,40 @@ contract EscrowTaskBoard is AragonApp {
 
     }
 
-    function placeBid(bytes32 _taskName, uint256 _price, string _description) isExist(_name) {
+    function placeBid(bytes32 _taskName, uint256 _price, string _description) isExist(_taskName) {
 
 
     }
 
-    function selectBid(bytes32 _taskName, address bidder) isExist(_name) {
+    function selectBid(bytes32 _taskName, address bidder) isExist(_taskName) {
 
     }
 
-    function finishTask(bytes32 _taskName) isExist(_name) {
+    function finishTask(bytes32 _taskName) isExist(_taskName) {
 
     }
 
-    function acceptTaskByCreator(bytes32 _taskName) isExist(_name) {
+    function acceptTaskByCreator(bytes32 _taskName) isExist(_taskName) {
 
     }
 
-    function rejectTaskByCreator(bytes32 _taskName) isExist(_name) {
+    function rejectTaskByCreator(bytes32 _taskName) isExist(_taskName) {
 
     }
 
-    function acceptTaskByArbiter(bytes32 _taskName) isExist(_name) {
+    function acceptTaskByArbiter(bytes32 _taskName) isExist(_taskName) {
 
     }
 
-    function rejectTaskByArbiter(bytes32 _taskName) isExist(_name) {
+    function rejectTaskByArbiter(bytes32 _taskName) isExist(_taskName) {
 
     }
 
-    function getBidders(bytes32 _taskName) isExist(_name) returns (address[]) {
+    function getBidders(bytes32 _taskName) isExist(_taskName) returns (address[]) {
 
     }
 
-    function getBid(bytes32 _taskName, address bidder) isExist(_name) returns (address, uint256, string, uint256) {
+    function getBid(bytes32 _taskName, address bidder) isExist(_taskName) returns (address, uint256, string, uint256) {
 
     }
 
