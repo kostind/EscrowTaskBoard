@@ -4,6 +4,7 @@ import "@aragon/os/contracts/apps/AragonApp.sol";
 import "@aragon/os/contracts/lib/math/SafeMath.sol";
 
 //TODO use errors like: string private constant ERROR_NO_VOTE = "VOTING_NO_VOTE";
+//TODO add docs
 
 contract EscrowTaskBoard is AragonApp {
     using SafeMath for uint256;
@@ -13,24 +14,24 @@ contract EscrowTaskBoard is AragonApp {
     enum State {
         //task has been created
         CREATED,
-        //task has been canceled by creator
+        //task has been canceled by client
         STARTED,
         //task has been finished by worker
         FINISHED,
-        //task has been accepted by creator -> amount of token has been sent to worker
+        //task has been accepted by client -> amount of token has been sent to worker
         ACCEPTED,
-        //task has been rejected by creator -> arbiter should decide what to do
+        //task has been rejected by client -> arbiter should decide what to do
         REJECTED,
         //task has been accepted by arbiter -> amount of token has been sent to worker
         ACCEPTED_BY_ARBITER,
-        //task has been rejected by arbiter -> amount of token has been sent to creator
+        //task has been rejected by arbiter -> amount of token has been sent to client
         REJECTED_BY_ARBITER,
-        //task has been expired: creator hasn't selected bid or worker hasn't marked task as finished
+        //task has been expired: client hasn't selected bid or worker hasn't marked task as finished
         EXPIRED
     }
 
     struct Task {
-        address creator;
+        address client;
         string description;
         address token;
         uint256 expirationTime;
@@ -53,30 +54,30 @@ contract EscrowTaskBoard is AragonApp {
 
     mapping(bytes32 => Task) public tasks;
 
-    mapping(address => bytes32[]) creatorTasks;
-    mapping(address => mapping(bytes32 => uint256)) creatorTaskIndexes;
+    mapping(address => bytes32[]) clientTasks;
+    mapping(address => mapping(bytes32 => uint256)) clientTaskIndexes;
 
     mapping(address => bytes32[]) workerTasks;
 
     modifier isExist(bytes32 _name) {
-        require(tasks[_name].creator != address(0), "Task not found");
+        require(tasks[_name].client != address(0), "Task not found");
         _;
     }
 
-    modifier isCreator(bytes32 _name) {
-        require(tasks[_name].creator == msg.sender, "You are not a creator of this task");
+    modifier isClient(bytes32 _name) {
+        require(tasks[_name].client == msg.sender, "You are not a client of this task");
         _;
     }
 
-    event TaskCreated(bytes32 indexed _name, string _description, address _token, uint256 _expirationTime, address indexed creator);
+    event TaskCreated(bytes32 indexed _name, string _description, address _token, uint256 _expirationTime, address indexed client);
     event TaskRemoved(bytes32 indexed _name);
     event BidPlaced(bytes32 indexed _taskName, uint256 _price, string _description, uint256 _implementationTime, address indexed bidder);
     event BidRemoved(bytes32 indexed _taskName, address indexed bidder);
     event BidSelected(bytes32 indexed _taskName, address indexed bidder);
     event TaskFinished(bytes32 indexed _name);
     event TaskExpired(bytes32 indexed _name);
-    event TaskAcceptedByCreator(bytes32 indexed _name);
-    event TaskRejectedByCreator(bytes32 indexed _name);
+    event TaskAcceptedByClient(bytes32 indexed _name);
+    event TaskRejectedByClient(bytes32 indexed _name);
     event TaskAcceptedByArbiter(bytes32 indexed _name);
     event TaskRejectedByArbiter(bytes32 indexed _name);
 
@@ -89,10 +90,10 @@ contract EscrowTaskBoard is AragonApp {
         require(bytes(_description).length > 0, "Invalid description");
         require(_token != address(0), "Invalid token");
         require(_expirationTime > now, "Expiration time should be in the future");
-        require(tasks[_name].creator == address(0), "Task already exists");
+        require(tasks[_name].client == address(0), "Task already exists");
 
         Task memory task;
-        task.creator = msg.sender;
+        task.client = msg.sender;
         task.description =_description;
         task.token = _token;
         task.expirationTime = _expirationTime;
@@ -100,13 +101,13 @@ contract EscrowTaskBoard is AragonApp {
         task.index = taskNames.length;
         tasks[_name] = task;
         taskNames.push(_name);
-        creatorTaskIndexes[msg.sender][_name] = creatorTasks[msg.sender].length;
-        creatorTasks[msg.sender].push(_name);
+        clientTaskIndexes[msg.sender][_name] = clientTasks[msg.sender].length;
+        clientTasks[msg.sender].push(_name);
 
         emit TaskCreated(_name, _description, _token, _expirationTime, msg.sender);
     }
 
-    function removeTask(bytes32 _name) isExist(_name) isCreator(_name) external {
+    function removeTask(bytes32 _name) isExist(_name) isClient(_name) external {
         Task storage task = tasks[_name];
         require(task.state == State.CREATED, "Already started task can't be canceled");
 
@@ -117,19 +118,19 @@ contract EscrowTaskBoard is AragonApp {
         }
         taskNames.length--;
         delete tasks[_name];
-        removeCreatorTask(_name, msg.sender);
+        removeClientTask(_name, msg.sender);
 
         emit TaskRemoved(_name);
     }
 
-    function removeCreatorTask(bytes32 _name, address _creator) private {
-        uint256 index = creatorTaskIndexes[_creator][_name];
-        uint256 lastIndex = creatorTasks[_creator].length - 1;
+    function removeClientTask(bytes32 _name, address _client) private {
+        uint256 index = clientTaskIndexes[_client][_name];
+        uint256 lastIndex = clientTasks[_client].length - 1;
         if (index != lastIndex) {
-            creatorTasks[_creator][index] = creatorTasks[_creator][lastIndex];
+            clientTasks[_client][index] = clientTasks[_client][lastIndex];
         }
-        creatorTasks[_creator].length--;
-        delete creatorTaskIndexes[_creator][_name];
+        clientTasks[_client].length--;
+        delete clientTaskIndexes[_client][_name];
     }
 
     function placeBid(bytes32 _taskName, uint256 _price, string _description, uint256 _implementationTime) external isExist(_taskName)  {
@@ -166,7 +167,7 @@ contract EscrowTaskBoard is AragonApp {
         emit BidRemoved(_taskName, msg.sender);
     }
 
-    function selectBid(bytes32 _taskName, address bidder) external isExist(_taskName) isCreator(_taskName) {
+    function selectBid(bytes32 _taskName, address bidder) external isExist(_taskName) isClient(_taskName) {
         Task storage task = tasks[_taskName];
         require(task.bids[bidder].price > 0, "Bid not found");
         Bid storage bid = task.bids[bidder];
@@ -191,31 +192,31 @@ contract EscrowTaskBoard is AragonApp {
         emit TaskFinished(_name);
     }
 
-    function markTaskAsExpired(bytes32 _name) external isExist(_name) isCreator(_name) {
+    function markTaskAsExpired(bytes32 _name) external isExist(_name) isClient(_name) {
         Task storage task = tasks[_name];
         require(task.state == State.STARTED, "Only started task can be expired");
         require(now > task.expirationTime, "Worker still has time for implementation");
 
         task.state = State.EXPIRED;
-        require(ERC20(task.token).transfer(task.creator, task.price), "Transfer failed");
+        require(ERC20(task.token).transfer(task.client, task.price), "Transfer failed");
         emit TaskExpired(_name);
     }
 
-    function acceptTaskByCreator(bytes32 _name) external isExist(_name) isCreator(_name) {
+    function acceptTaskByClient(bytes32 _name) external isExist(_name) isClient(_name) {
         Task storage task = tasks[_name];
         require(task.state == State.FINISHED, "Only finished task can be accepted");
 
         task.state = State.ACCEPTED;
         require(ERC20(task.token).transfer(task.worker, task.price), "Transfer failed");
-        emit TaskAcceptedByCreator(_name);
+        emit TaskAcceptedByClient(_name);
     }
 
-    function rejectTaskByCreator(bytes32 _name) external isExist(_name) isCreator(_name) {
+    function rejectTaskByClient(bytes32 _name) external isExist(_name) isClient(_name) {
         Task storage task = tasks[_name];
         require(task.state == State.FINISHED, "Only finished task can be rejected");
 
         task.state = State.REJECTED;
-        emit TaskRejectedByCreator(_name);
+        emit TaskRejectedByClient(_name);
     }
 
     function acceptTaskByArbiter(bytes32 _name) external isExist(_name) auth(ARBITER_ROLE) {
@@ -232,13 +233,13 @@ contract EscrowTaskBoard is AragonApp {
         require(task.state == State.REJECTED, "Only rejected task can be rejected by arbiter");
 
         task.state = State.REJECTED_BY_ARBITER;
-        require(ERC20(task.token).transfer(task.creator, task.price), "Transfer failed");
+        require(ERC20(task.token).transfer(task.client, task.price), "Transfer failed");
         emit TaskRejectedByArbiter(_name);
     }
 
     function getTask(bytes32 _name) external isExist(_name) returns (address, string, address, uint256, uint256, address, State) {
         Task storage task = tasks[_name];
-        return (task.creator, task.description, task.token, task.expirationTime, task.price, task.worker, task.state);
+        return (task.client, task.description, task.token, task.expirationTime, task.price, task.worker, task.state);
     }
 
     function getBidders(bytes32 _name) external isExist(_name) returns (address[]) {
@@ -252,8 +253,8 @@ contract EscrowTaskBoard is AragonApp {
         return (bid.price, bid.description, bid.implementationTime);
     }
 
-    function getCreatorTasks(address _creator) external returns (bytes32[]) {
-        return creatorTasks[_creator];
+    function getClientTasks(address _client) external returns (bytes32[]) {
+        return clientTasks[_client];
     }
 
     function getWorkerTasks(address _worker) external returns (bytes32[]) {
