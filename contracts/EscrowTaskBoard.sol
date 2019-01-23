@@ -3,6 +3,8 @@ pragma solidity ^0.4.24;
 import "@aragon/os/contracts/apps/AragonApp.sol";
 import "@aragon/os/contracts/lib/math/SafeMath.sol";
 
+//TODO use errors like: string private constant ERROR_NO_VOTE = "VOTING_NO_VOTE";
+
 contract EscrowTaskBoard is AragonApp {
     using SafeMath for uint256;
 
@@ -49,7 +51,12 @@ contract EscrowTaskBoard is AragonApp {
 
     bytes32[] public taskNames;
 
-    mapping(bytes32 => Task) tasks;
+    mapping(bytes32 => Task) public tasks;
+
+    mapping(address => bytes32[]) creatorTasks;
+    mapping(address => mapping(bytes32 => uint256)) creatorTaskIndexes;
+
+    mapping(address => bytes32[]) workerTasks;
 
     modifier isExist(bytes32 _name) {
         require(tasks[_name].creator != address(0), "Task not found");
@@ -93,6 +100,8 @@ contract EscrowTaskBoard is AragonApp {
         task.index = taskNames.length;
         tasks[_name] = task;
         taskNames.push(_name);
+        creatorTaskIndexes[msg.sender][_name] = creatorTasks[msg.sender].length;
+        creatorTasks[msg.sender].push(_name);
 
         emit TaskCreated(_name, _description, _token, _expirationTime, msg.sender);
     }
@@ -108,8 +117,19 @@ contract EscrowTaskBoard is AragonApp {
         }
         taskNames.length--;
         delete tasks[_name];
+        removeCreatorTask(_name, msg.sender);
 
         emit TaskRemoved(_name);
+    }
+
+    function removeCreatorTask(bytes32 _name, address _creator) private {
+        uint256 index = creatorTaskIndexes[_creator][_name];
+        uint256 lastIndex = creatorTasks[_creator].length - 1;
+        if (index != lastIndex) {
+            creatorTasks[_creator][index] = creatorTasks[_creator][lastIndex];
+        }
+        creatorTasks[_creator].length--;
+        delete creatorTaskIndexes[_creator][_name];
     }
 
     function placeBid(bytes32 _taskName, uint256 _price, string _description, uint256 _implementationTime) external isExist(_taskName)  {
@@ -156,6 +176,7 @@ contract EscrowTaskBoard is AragonApp {
         task.expirationTime = now.add(bid.implementationTime);
         task.state = State.STARTED;
         task.price = bid.price;
+        workerTasks[bidder].push(_taskName);
         require(ERC20(task.token).transferFrom(msg.sender, this, task.price), "Transfer failed");
 
         emit BidSelected(_taskName, bidder);
@@ -215,24 +236,28 @@ contract EscrowTaskBoard is AragonApp {
         emit TaskRejectedByArbiter(_name);
     }
 
-    function getBidders(bytes32 _taskName) external isExist(_taskName) returns (address[]) {
-
+    function getTask(bytes32 _name) external isExist(_name) returns (address, string, address, uint256, uint256, address, State) {
+        Task storage task = tasks[_name];
+        return (task.creator, task.description, task.token, task.expirationTime, task.price, task.worker, task.state);
     }
 
-    function getBid(bytes32 _taskName, address bidder) external isExist(_taskName) returns (address, uint256, string, uint256) {
-
+    function getBidders(bytes32 _name) external isExist(_name) returns (address[]) {
+        return tasks[_name].bidders;
     }
 
-    function getCreatorTasks(address _creator, State _state) external returns (bytes32, string, address, uint256, address, address, address, State) {
-
+    function getBid(bytes32 _name, address bidder) external isExist(_name) returns (uint256, string, uint256) {
+        Task storage task = tasks[_name];
+        require(task.bids[bidder].price > 0, "Bid not found");
+        Bid storage bid = task.bids[bidder];
+        return (bid.price, bid.description, bid.implementationTime);
     }
 
-    function getWorkerTasks(address _creator, State _state) external returns (bytes32, string, address, uint256, address, address, address, State) {
-
+    function getCreatorTasks(address _creator) external returns (bytes32[]) {
+        return creatorTasks[_creator];
     }
 
-    function getRejectedTasks(address _creator, State _state) external returns (bytes32, string, address, uint256, address, address, address) {
-
+    function getWorkerTasks(address _worker) external returns (bytes32[]) {
+        return workerTasks[_worker];
     }
 
 }
