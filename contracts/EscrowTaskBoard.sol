@@ -6,6 +6,8 @@ import "@aragon/os/contracts/lib/math/SafeMath.sol";
 contract EscrowTaskBoard is AragonApp {
     using SafeMath for uint256;
 
+    bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
+
     enum State {
         //task has been created
         CREATED,
@@ -59,11 +61,17 @@ contract EscrowTaskBoard is AragonApp {
         _;
     }
 
-    event TaskCreated(bytes32 indexed _name, string _description, address _token, uint256 _expirationTime, address creator);
+    event TaskCreated(bytes32 indexed _name, string _description, address _token, uint256 _expirationTime, address indexed creator);
     event TaskRemoved(bytes32 indexed _name);
-
-
-    //TODO add more events
+    event BidPlaced(bytes32 indexed _taskName, uint256 _price, string _description, uint256 _implementationTime, address indexed bidder);
+    event BidRemoved(bytes32 indexed _taskName, address indexed bidder);
+    event BidSelected(bytes32 indexed _taskName, address indexed bidder);
+    event TaskFinished(bytes32 indexed _name);
+    event TaskExpired(bytes32 indexed _name);
+    event TaskAcceptedByCreator(bytes32 indexed _name);
+    event TaskRejectedByCreator(bytes32 indexed _name);
+    event TaskAcceptedByArbiter(bytes32 indexed _name);
+    event TaskRejectedByArbiter(bytes32 indexed _name);
 
     function initialize() public onlyInit {
         initialized();
@@ -99,7 +107,7 @@ contract EscrowTaskBoard is AragonApp {
             tasks[taskNames[index]].index = index;
         }
         taskNames.length--;
-        delete task;
+        delete tasks[_name];
 
         emit TaskRemoved(_name);
     }
@@ -118,6 +126,8 @@ contract EscrowTaskBoard is AragonApp {
         bid.index = task.bidders.length;
         task.bids[msg.sender] = bid;
         task.bidders.push(msg.sender);
+
+        emit BidPlaced(_taskName, _price, _description, _implementationTime, msg.sender);
     }
 
     function removeBid(bytes32 _taskName) external isExist(_taskName) {
@@ -132,6 +142,8 @@ contract EscrowTaskBoard is AragonApp {
         }
         task.bidders.length--;
         delete task.bids[msg.sender];
+
+        emit BidRemoved(_taskName, msg.sender);
     }
 
     function selectBid(bytes32 _taskName, address bidder) external isExist(_taskName) isCreator(_taskName) {
@@ -144,56 +156,63 @@ contract EscrowTaskBoard is AragonApp {
         task.expirationTime = now.add(bid.implementationTime);
         task.state = State.STARTED;
         task.price = bid.price;
-
         require(ERC20(task.token).transferFrom(msg.sender, this, task.price), "Transfer failed");
+
+        emit BidSelected(_taskName, bidder);
     }
 
-    function finishTask(bytes32 _taskName) external isExist(_taskName) {
-        Task storage task = tasks[_taskName];
+    function finishTask(bytes32 _name) external isExist(_name) {
+        Task storage task = tasks[_name];
         require(task.worker == msg.sender, "You are not a worker on this task");
         require(task.state == State.STARTED, "Only started task can be finished");
 
         task.state = State.FINISHED;
+        emit TaskFinished(_name);
     }
 
     function markTaskAsExpired(bytes32 _name) external isExist(_name) isCreator(_name) {
-        Task storage task = tasks[_taskName];
+        Task storage task = tasks[_name];
         require(task.state == State.STARTED, "Only started task can be expired");
         require(now > task.expirationTime, "Worker still has time for implementation");
 
         task.state = State.EXPIRED;
         require(ERC20(task.token).transfer(task.creator, task.price), "Transfer failed");
+        emit TaskExpired(_name);
     }
 
-    function acceptTaskByCreator(bytes32 _taskName) external isExist(_taskName) isCreator(_name) {
-        Task storage task = tasks[_taskName];
+    function acceptTaskByCreator(bytes32 _name) external isExist(_name) isCreator(_name) {
+        Task storage task = tasks[_name];
         require(task.state == State.FINISHED, "Only finished task can be accepted");
 
         task.state = State.ACCEPTED;
         require(ERC20(task.token).transfer(task.worker, task.price), "Transfer failed");
+        emit TaskAcceptedByCreator(_name);
     }
 
-    function rejectTaskByCreator(bytes32 _taskName) external isExist(_taskName) isCreator(_name) {
-        Task storage task = tasks[_taskName];
+    function rejectTaskByCreator(bytes32 _name) external isExist(_name) isCreator(_name) {
+        Task storage task = tasks[_name];
         require(task.state == State.FINISHED, "Only finished task can be rejected");
 
         task.state = State.REJECTED;
+        emit TaskRejectedByCreator(_name);
     }
 
-    function acceptTaskByArbiter(bytes32 _taskName) external isExist(_taskName) {
-        Task storage task = tasks[_taskName];
+    function acceptTaskByArbiter(bytes32 _name) external isExist(_name) auth(ARBITER_ROLE) {
+        Task storage task = tasks[_name];
         require(task.state == State.REJECTED, "Only rejected task can be accepted by arbiter");
 
         task.state = State.ACCEPTED_BY_ARBITER;
         require(ERC20(task.token).transfer(task.worker, task.price), "Transfer failed");
+        emit TaskAcceptedByArbiter(_name);
     }
 
-    function rejectTaskByArbiter(bytes32 _taskName) external isExist(_taskName) {
-        Task storage task = tasks[_taskName];
+    function rejectTaskByArbiter(bytes32 _name) external isExist(_name) auth(ARBITER_ROLE) {
+        Task storage task = tasks[_name];
         require(task.state == State.REJECTED, "Only rejected task can be rejected by arbiter");
 
         task.state = State.REJECTED_BY_ARBITER;
         require(ERC20(task.token).transfer(task.creator, task.price), "Transfer failed");
+        emit TaskRejectedByArbiter(_name);
     }
 
     function getBidders(bytes32 _taskName) external isExist(_taskName) returns (address[]) {
