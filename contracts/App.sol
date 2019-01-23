@@ -237,28 +237,28 @@ contract EscrowTaskBoard is AragonApp {
         emit TaskRejectedByArbiter(_name);
     }
 
-    function getTask(bytes32 _name) external view isExist(_name) returns (address, string, address, uint256, uint256, address, State) {
-        Task storage task = tasks[_name];
-        return (task.client, task.description, task.token, task.expirationTime, task.price, task.worker, task.state);
-    }
+//    function getTask(bytes32 _name) external view isExist(_name) returns (address, string, address, uint256, uint256, address, State) {
+//        Task storage task = tasks[_name];
+//        return (task.client, task.description, task.token, task.expirationTime, task.price, task.worker, task.state);
+//    }
+//
+//    function getBidders(bytes32 _name) external view isExist(_name) returns (address[]) {
+//        return tasks[_name].bidders;
+//    }
+//
+//    function getBid(bytes32 _name, address bidder) external view isExist(_name) returns (uint256, string, uint256) {
+//        Task storage task = tasks[_name];
+//        require(task.bids[bidder].price > 0, "Bid not found");
+//        Bid storage bid = task.bids[bidder];
+//        return (bid.price, bid.description, bid.implementationTime);
+//    }
 
-    function getBidders(bytes32 _name) external view isExist(_name) returns (address[]) {
-        return tasks[_name].bidders;
-    }
-
-    function getBid(bytes32 _name, address bidder) external view isExist(_name) returns (uint256, string, uint256) {
-        Task storage task = tasks[_name];
-        require(task.bids[bidder].price > 0, "Bid not found");
-        Bid storage bid = task.bids[bidder];
-        return (bid.price, bid.description, bid.implementationTime);
-    }
-
-    function getClientTasks(address _client) external view returns (bytes32[]) {
-        return clientTasks[_client];
-    }
-
-    function getWorkerTasks(address _worker) external view returns (bytes32[]) {
-        return workerTasks[_worker];
-    }
+//    function getClientTasks(address _client) external view returns (bytes32[]) {
+//        return clientTasks[_client];
+//    }
+//
+//    function getWorkerTasks(address _worker) external view returns (bytes32[]) {
+//        return workerTasks[_worker];
+//    }
 
 }

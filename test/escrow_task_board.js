@@ -4,14 +4,14 @@ const { assertRevert } = require('@aragon/test-helpers/assertThrow');
 const getBlockNumber = require('@aragon/test-helpers/blockNumber')(web3);
 const timeTravel = require('@aragon/test-helpers/timeTravel')(web3);
 const { encodeCallScript, EMPTY_SCRIPT } = require('@aragon/test-helpers/evmScript');
-const ExecutionTarget = artifacts.require('ExecutionTarget');
+// const ExecutionTarget = artifacts.require('ExecutionTarget');
 
-const DAOFactory = artifacts.require('@aragon/os/contracts/factory/DAOFactory');
-const EVMScriptRegistryFactory = artifacts.require('@aragon/os/contracts/factory/EVMScriptRegistryFactory');
-const ACL = artifacts.require('@aragon/os/contracts/acl/ACL');
-const Kernel = artifacts.require('@aragon/os/contracts/kernel/Kernel');
+// const DAOFactory = artifacts.require('@aragon/os/contracts/factory/DAOFactory');
+// const EVMScriptRegistryFactory = artifacts.require('@aragon/os/contracts/factory/EVMScriptRegistryFactory');
+// const ACL = artifacts.require('@aragon/os/contracts/acl/ACL');
+// const Kernel = artifacts.require('@aragon/os/contracts/kernel/Kernel');
 
-const MiniMeToken = artifacts.require('@aragon/apps-shared-minime/contracts/MiniMeToken');
+// const MiniMeToken = artifacts.require('@aragon/apps-shared-minime/contracts/MiniMeToken');
 
 const getContract = name => artifacts.require(name);
 const bigExp = (x, y) => new web3.BigNumber(x).times(new web3.BigNumber(10).toPower(y));
