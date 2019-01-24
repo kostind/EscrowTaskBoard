@@ -1,5 +1,5 @@
 {
-  "name": "app-name",
+  "name": "@aragon/apps-escrow-task-board",
   "version": "1.0.0",
   "description": "",
   "dependencies": {
@@ -19,7 +19,8 @@
     "solium": "^1.0.4",
     "truffle": "4.1.14",
     "truffle-hdwallet-provider": "0.0.3",
-    "webpack": "3.10.0"
+    "webpack": "3.10.0",
+    "lerna": "^2.8.0"
   },
   "scripts": {
     "start": "aragon run",
@@ -32,7 +33,9 @@
     "publish:patch": "aragon apm publish patch",
     "publish:minor": "aragon apm publish minor",
     "publish:major": "aragon apm publish major",
-    "versions": "aragon apm versions"
+    "versions": "aragon apm versions",
+    "coverage": "npm run coverage:all",
+    "coverage:all": "lerna run --scope=@aragon/apps-* --concurrency=1 --stream coverage"
   },
   "keywords": []
 }
