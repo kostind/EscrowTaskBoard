@@ -29,6 +29,15 @@ const EscrowTaskBoard = artifacts.require('EscrowTaskBoard');
 const ANY_ADDRESS = '0xffffffffffffffffffffffffffffffffffffffff';
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 
+const TASK_CREATED = 0;
+const TASK_STARTED = 1;
+const TASK_FINISHED = 2;
+const TASK_ACCEPTED = 3;
+const TASK_REJECTED = 4;
+const TASK_ACCEPTED_BY_ARBITER = 5;
+const TASK_REJECTED_BY_ARBITER = 6;
+const TASK_EXPIRED = 7;
+
 contract('Escrow Task Board App', (accounts) => {
     let taskBoardBase, daoFact, taskBoard, token, executionTarget;
 
@@ -81,7 +90,6 @@ contract('Escrow Task Board App', (accounts) => {
         });
 
         it('creates task', async () => {
-
             let taskName = "task01";
             let taskDescription = "task description";
             const tx = await taskBoard.createTask(taskName, taskDescription, token.address, day, {from: accountClient});
@@ -93,9 +101,7 @@ contract('Escrow Task Board App', (accounts) => {
             assert.equal(event._expirationTime, day);
             assert.equal(event._client, accountClient);
 
-            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, now + day, 0, NULL_ADDRESS, 0);
-
-
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, now + day, 0, NULL_ADDRESS, TASK_CREATED);
         })
 
 
@@ -106,10 +112,10 @@ contract('Escrow Task Board App', (accounts) => {
         assert.equal(task[0], client);
         assert.equal(task[1], description);
         assert.equal(task[2], token.address);
-        assert.equal(task[3].toString(), expiration);
+        assert.equal(task[3].toNumber(), expiration);
         assert.equal(task[4], price);
         assert.equal(task[5], worker);
-        assert.equal(task[6], state);
+        assert.equal(task[6].toNumber(), state);
     }
 
 });
