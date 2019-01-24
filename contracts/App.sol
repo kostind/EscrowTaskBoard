@@ -69,9 +69,9 @@ contract EscrowTaskBoard is AragonApp {
         _;
     }
 
-    event TaskCreated(bytes32 indexed _name, string _description, address _token, uint256 _expirationTime, address indexed client);
+    event TaskCreated(bytes32 indexed _name, string _description, address _token, uint256 _expirationTime, address indexed _client);
     event TaskRemoved(bytes32 indexed _name);
-    event BidPlaced(bytes32 indexed _taskName, uint256 _price, string _description, uint256 _implementationTime, address indexed bidder);
+    event BidPlaced(bytes32 indexed _taskName, uint256 _price, string _description, uint256 _implementationTime, address indexed _bidder);
     event BidRemoved(bytes32 indexed _taskName, address indexed bidder);
     event BidSelected(bytes32 indexed _taskName, address indexed bidder);
     event TaskFinished(bytes32 indexed _name);
@@ -89,14 +89,14 @@ contract EscrowTaskBoard is AragonApp {
         require(_name != bytes32(0), "Invalid name");
         require(bytes(_description).length > 0, "Invalid description");
         require(_token != address(0), "Invalid token");
-        require(_expirationTime > now, "Expiration time should be in the future");
+        require(_expirationTime >= 1 days, "Expiration time should be at least one day");
         require(tasks[_name].client == address(0), "Task already exists");
 
         Task memory task;
         task.client = msg.sender;
         task.description =_description;
         task.token = _token;
-        task.expirationTime = _expirationTime;
+        task.expirationTime = now.add(_expirationTime);
         task.state = State.CREATED;
         task.index = taskNames.length;
         tasks[_name] = task;

@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "dependencies": {
+    "@aragon/apps-shared-minime": "^1.0.1",
     "@aragon/client": "^1.1.0",
-    "@aragon/os": "^4.0.1"
+    "@aragon/os": "^4.0.1",
+    "@types/node": "^10.12.18"
   },
   "devDependencies": {
     "@aragon/cli": "^5.2.2",
