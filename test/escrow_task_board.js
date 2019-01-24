@@ -62,9 +62,11 @@ contract('Escrow Task Board App', (accounts) => {
         // Setup constants
         APP_MANAGER_ROLE = await kernelBase.APP_MANAGER_ROLE();
         ARBITER_ROLE = await taskBoardBase.ARBITER_ROLE();
-    });
 
-    beforeEach(async () => {
+        token = await MiniMeToken.new(NULL_ADDRESS, NULL_ADDRESS, 0, 'n', 0, 'n', true); // empty parameters minime
+
+        await token.generateTokens(accountClient, 1000);
+
         const r = await daoFact.newDAO(root);
         const dao = Kernel.at(r.logs.filter(l => l.event === 'DeployDAO')[0].args.dao);
         const acl = ACL.at(await dao.acl());
@@ -79,19 +81,16 @@ contract('Escrow Task Board App', (accounts) => {
         await acl.createPermission(ANY_ADDRESS, taskBoard.address, ARBITER_ROLE, root, {from: root});
     });
 
+    beforeEach(async () => {
+        //TODO remove ?
+        now = (await getBlock(await getBlockNumber())).timestamp;
+    });
+
     context('task creation tests', () => {
 
-        beforeEach(async () => {
-            token = await MiniMeToken.new(NULL_ADDRESS, NULL_ADDRESS, 0, 'n', 0, 'n', true); // empty parameters minime
-
-            await token.generateTokens(accountClient, 1000);
-
-            now = (await getBlock(await getBlockNumber())).timestamp;
-        });
-
-        it('creates task', async () => {
-            let taskName = "task01";
-            let taskDescription = "task description";
+        it('creates first task', async () => {
+            const taskName = "task01";
+            const taskDescription = "task description";
             const tx = await taskBoard.createTask(taskName, taskDescription, token.address, day, {from: accountClient});
             const event = tx.logs[0].args;
 
@@ -101,22 +100,75 @@ contract('Escrow Task Board App', (accounts) => {
             assert.equal(event._expirationTime, day);
             assert.equal(event._client, accountClient);
 
-            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, now + day, 0, NULL_ADDRESS, TASK_CREATED);
-        })
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, day, 0, NULL_ADDRESS, TASK_CREATED);
+        });
+
+        it('creates second task', async () => {
+            const taskName = "task02";
+            const taskDescription = "task 2 description";
+            const tx = await taskBoard.createTask(taskName, taskDescription, token.address, day, {from: accountClient});
+            const event = tx.logs[0].args;
+
+            assert.equal(web3Utils.toUtf8(event._name), taskName);
+            assert.equal(event._description, taskDescription);
+            assert.equal(event._token, token.address);
+            assert.equal(event._expirationTime, day);
+            assert.equal(event._client, accountClient);
+
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, day, 0, NULL_ADDRESS, TASK_CREATED);
+        });
+
+        it('removes task', async () => {
+            const taskName = "task01";
+            const tx = await taskBoard.removeTask(taskName, {from: accountClient});
+            const event = tx.logs[0].args;
+
+            assert.equal(web3Utils.toUtf8(event._name), taskName);
+
+            return assertRevert(async () => {
+                await taskBoard.getTask.call(taskName);
+            });
+        });
+
+    });
+
+    context('bid placement tests', () => {
+
+        it('places bid', async () => {
+            const taskName = "task02";
+            const bidDescription = "bid description";
+            const bidPrice = 125;
+            const bidTime = 2 * day;
+            const tx = await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+            const event = tx.logs[0].args;
+
+            assert.equal(web3Utils.toUtf8(event._taskName), taskName);
+            assert.equal(event._price, bidPrice);
+            assert.equal(event._description, bidDescription);
+            assert.equal(event._implementationTime, bidTime);
+            assert.equal(event._bidder, accountWorker);
+
+            const bid = await taskBoard.getBid.call(taskName, accountWorker);
+            assert.equal(bid[0], bidPrice);
+            assert.equal(bid[1], bidDescription);
+            assert.equal(bid[2].toNumber(), bidTime);
+        });
 
 
     });
 
     const checkTask = async(taskBoard, name, client, description, token, expiration, price, worker, state) => {
         const task = await taskBoard.getTask.call(name);
+
+        now = (await getBlock(await getBlockNumber())).timestamp;
+
         assert.equal(task[0], client);
         assert.equal(task[1], description);
         assert.equal(task[2], token.address);
-        assert.equal(task[3].toNumber(), expiration);
+        assert.equal(task[3].toNumber(), now + expiration);
         assert.equal(task[4], price);
         assert.equal(task[5], worker);
         assert.equal(task[6].toNumber(), state);
     }
 
 });
-
