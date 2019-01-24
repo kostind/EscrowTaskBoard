@@ -52,12 +52,12 @@ contract EscrowTaskBoard is AragonApp {
 
     bytes32[] public taskNames;
 
-    mapping(bytes32 => Task) public tasks;
+    mapping(bytes32 => Task) internal tasks;
 
-    mapping(address => bytes32[]) clientTasks;
-    mapping(address => mapping(bytes32 => uint256)) clientTaskIndexes;
+    mapping(address => bytes32[]) public clientTasks;
+    mapping(address => mapping(bytes32 => uint256)) internal clientTaskIndexes;
 
-    mapping(address => bytes32[]) workerTasks;
+    mapping(address => bytes32[]) public workerTasks;
 
     modifier isExist(bytes32 _name) {
         require(tasks[_name].client != address(0), "Task not found");
@@ -237,28 +237,20 @@ contract EscrowTaskBoard is AragonApp {
         emit TaskRejectedByArbiter(_name);
     }
 
-//    function getTask(bytes32 _name) external view isExist(_name) returns (address, string, address, uint256, uint256, address, State) {
-//        Task storage task = tasks[_name];
-//        return (task.client, task.description, task.token, task.expirationTime, task.price, task.worker, task.state);
-//    }
-//
-//    function getBidders(bytes32 _name) external view isExist(_name) returns (address[]) {
-//        return tasks[_name].bidders;
-//    }
-//
-//    function getBid(bytes32 _name, address bidder) external view isExist(_name) returns (uint256, string, uint256) {
-//        Task storage task = tasks[_name];
-//        require(task.bids[bidder].price > 0, "Bid not found");
-//        Bid storage bid = task.bids[bidder];
-//        return (bid.price, bid.description, bid.implementationTime);
-//    }
+    function getTask(bytes32 _name) external view isExist(_name) returns (address, string, address, uint256, uint256, address, State) {
+        Task storage task = tasks[_name];
+        return (task.client, task.description, task.token, task.expirationTime, task.price, task.worker, task.state);
+    }
 
-//    function getClientTasks(address _client) external view returns (bytes32[]) {
-//        return clientTasks[_client];
-//    }
-//
-//    function getWorkerTasks(address _worker) external view returns (bytes32[]) {
-//        return workerTasks[_worker];
-//    }
+    function getBidders(bytes32 _name) external view isExist(_name) returns (address[]) {
+        return tasks[_name].bidders;
+    }
+
+    function getBid(bytes32 _name, address bidder) external view isExist(_name) returns (uint256, string, uint256) {
+        Task storage task = tasks[_name];
+        require(task.bids[bidder].price > 0, "Bid not found");
+        Bid storage bid = task.bids[bidder];
+        return (bid.price, bid.description, bid.implementationTime);
+    }
 
 }
