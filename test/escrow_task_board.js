@@ -6,10 +6,10 @@ const timeTravel = require('@aragon/test-helpers/timeTravel')(web3);
 const { encodeCallScript, EMPTY_SCRIPT } = require('@aragon/test-helpers/evmScript');
 // const ExecutionTarget = artifacts.require('ExecutionTarget');
 
-// const DAOFactory = artifacts.require('@aragon/os/contracts/factory/DAOFactory');
-// const EVMScriptRegistryFactory = artifacts.require('@aragon/os/contracts/factory/EVMScriptRegistryFactory');
-// const ACL = artifacts.require('@aragon/os/contracts/acl/ACL');
-// const Kernel = artifacts.require('@aragon/os/contracts/kernel/Kernel');
+const DAOFactory = artifacts.require('@aragon/os/contracts/factory/DAOFactory');
+const EVMScriptRegistryFactory = artifacts.require('@aragon/os/contracts/factory/EVMScriptRegistryFactory');
+const ACL = artifacts.require('@aragon/os/contracts/acl/ACL');
+const Kernel = artifacts.require('@aragon/os/contracts/kernel/Kernel');
 
 // const MiniMeToken = artifacts.require('@aragon/apps-shared-minime/contracts/MiniMeToken');
 
@@ -27,5 +27,20 @@ const NULL_ADDRESS = '0x00';
 
 
 contract('Escrow_task_board', (accounts) => {
+
+  before(async () => {
+    const kernelBase = await getContract('Kernel').new(true) // petrify immediately
+    const aclBase = await getContract('ACL').new()
+    const regFact = await EVMScriptRegistryFactory.new()
+    // daoFact = await DAOFactory.new(kernelBase.address, aclBase.address, regFact.address)
+    // votingBase = await Voting.new()
+    //
+    // // Setup constants
+    // APP_MANAGER_ROLE = await kernelBase.APP_MANAGER_ROLE()
+    // CREATE_VOTES_ROLE = await votingBase.CREATE_VOTES_ROLE()
+    // MODIFY_SUPPORT_ROLE = await votingBase.MODIFY_SUPPORT_ROLE()
+    // MODIFY_QUORUM_ROLE = await votingBase.MODIFY_QUORUM_ROLE()
+  })
+
   it('should be tested')
 });
