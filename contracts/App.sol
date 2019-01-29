@@ -72,8 +72,8 @@ contract EscrowTaskBoard is AragonApp {
     event TaskCreated(bytes32 indexed _name, string _description, address _token, uint256 _expirationTime, address indexed _client);
     event TaskRemoved(bytes32 indexed _name);
     event BidPlaced(bytes32 indexed _taskName, uint256 _price, string _description, uint256 _implementationTime, address indexed _bidder);
-    event BidRemoved(bytes32 indexed _taskName, address indexed bidder);
-    event BidSelected(bytes32 indexed _taskName, address indexed bidder);
+    event BidRemoved(bytes32 indexed _taskName, address indexed _bidder);
+    event BidSelected(bytes32 indexed _taskName, address indexed _bidder);
     event TaskFinished(bytes32 indexed _name);
     event TaskExpired(bytes32 indexed _name);
     event TaskAcceptedByClient(bytes32 indexed _name);

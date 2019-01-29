@@ -50,7 +50,7 @@ contract('Escrow Task Board App', (accounts) => {
 
     let now;
 
-    const day = 60 * 60 * 24;
+    const DAY = 60 * 60 * 24;
 
     before(async () => {
         const kernelBase = await getContract('Kernel').new(true);// petrify immediately
@@ -91,39 +91,39 @@ contract('Escrow Task Board App', (accounts) => {
         it('creates first task', async () => {
             const taskName = "task01";
             const taskDescription = "task description";
-            const tx = await taskBoard.createTask(taskName, taskDescription, token.address, day, {from: accountClient});
-            const event = tx.logs[0].args;
+            const tx = await taskBoard.createTask(taskName, taskDescription, token.address, DAY, {from: accountClient});
+            const args = tx.logs.filter(log => log.event === 'TaskCreated')[0].args;
 
-            assert.equal(web3Utils.toUtf8(event._name), taskName);
-            assert.equal(event._description, taskDescription);
-            assert.equal(event._token, token.address);
-            assert.equal(event._expirationTime, day);
-            assert.equal(event._client, accountClient);
+            assert.equal(web3Utils.toUtf8(args._name), taskName);
+            assert.equal(args._description, taskDescription);
+            assert.equal(args._token, token.address);
+            assert.equal(args._expirationTime, DAY);
+            assert.equal(args._client, accountClient);
 
-            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, day, 0, NULL_ADDRESS, TASK_CREATED);
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, DAY, 0, NULL_ADDRESS, TASK_CREATED);
         });
 
         it('creates second task', async () => {
             const taskName = "task02";
             const taskDescription = "task 2 description";
-            const tx = await taskBoard.createTask(taskName, taskDescription, token.address, day, {from: accountClient});
-            const event = tx.logs[0].args;
+            const tx = await taskBoard.createTask(taskName, taskDescription, token.address, DAY, {from: accountClient});
+            const args = tx.logs.filter(log => log.event === 'TaskCreated')[0].args;
 
-            assert.equal(web3Utils.toUtf8(event._name), taskName);
-            assert.equal(event._description, taskDescription);
-            assert.equal(event._token, token.address);
-            assert.equal(event._expirationTime, day);
-            assert.equal(event._client, accountClient);
+            assert.equal(web3Utils.toUtf8(args._name), taskName);
+            assert.equal(args._description, taskDescription);
+            assert.equal(args._token, token.address);
+            assert.equal(args._expirationTime, DAY);
+            assert.equal(args._client, accountClient);
 
-            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, day, 0, NULL_ADDRESS, TASK_CREATED);
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, DAY, 0, NULL_ADDRESS, TASK_CREATED);
         });
 
         it('removes task', async () => {
             const taskName = "task01";
             const tx = await taskBoard.removeTask(taskName, {from: accountClient});
-            const event = tx.logs[0].args;
+            const args = tx.logs.filter(log => log.event === 'TaskRemoved')[0].args;
 
-            assert.equal(web3Utils.toUtf8(event._name), taskName);
+            assert.equal(web3Utils.toUtf8(args._name), taskName);
 
             return assertRevert(async () => {
                 await taskBoard.getTask.call(taskName);
@@ -138,20 +138,71 @@ contract('Escrow Task Board App', (accounts) => {
             const taskName = "task02";
             const bidDescription = "bid description";
             const bidPrice = 125;
-            const bidTime = 2 * day;
+            const bidTime = 2 * DAY;
             const tx = await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
-            const event = tx.logs[0].args;
+            const args = tx.logs.filter(log => log.event === 'BidPlaced')[0].args;
 
-            assert.equal(web3Utils.toUtf8(event._taskName), taskName);
-            assert.equal(event._price, bidPrice);
-            assert.equal(event._description, bidDescription);
-            assert.equal(event._implementationTime, bidTime);
-            assert.equal(event._bidder, accountWorker);
+            assert.equal(web3Utils.toUtf8(args._taskName), taskName);
+            assert.equal(args._price, bidPrice);
+            assert.equal(args._description, bidDescription);
+            assert.equal(args._implementationTime, bidTime);
+            assert.equal(args._bidder, accountWorker);
 
             const bid = await taskBoard.getBid.call(taskName, accountWorker);
             assert.equal(bid[0], bidPrice);
             assert.equal(bid[1], bidDescription);
             assert.equal(bid[2].toNumber(), bidTime);
+        });
+
+        it('removes bid', async () => {
+            const taskName = "task02";
+            const tx = await taskBoard.removeBid(taskName, {from: accountWorker});
+            const args = tx.logs.filter(log => log.event === 'BidRemoved')[0].args;
+
+            assert.equal(web3Utils.toUtf8(args._taskName), taskName);
+            assert.equal(args._bidder, accountWorker);
+
+            return assertRevert(async () => {
+                await taskBoard.getBid.call(taskName, accountWorker);
+            });
+        });
+
+        it('selects bid', async () => {
+            const taskName = "task02";
+            const bidDescription = "bid description";
+            const bidPrice = 125;
+            const bidTime = 2 * DAY;
+            await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+
+            const balance = await token.balanceOf.call(taskBoard.address);
+
+            await token.approve(taskBoard.address, bidPrice, {from: accountClient});
+            const tx = await taskBoard.selectBid(taskName, accountWorker, {from: accountClient});
+            const args = tx.logs.filter(log => log.event === 'BidSelected')[0].args;
+            assert.equal(web3Utils.toUtf8(args._taskName), taskName);
+            assert.equal(args._bidder, accountWorker);
+
+            const newBalance = await token.balanceOf.call(taskBoard.address);
+            assert.equal(newBalance - balance, bidPrice);
+
+            const taskDescription = "task 2 description";
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, bidTime, bidPrice, accountWorker, TASK_STARTED);
+        });
+
+    });
+
+    context('task processing tests', () => {
+
+        it('finishes task', async () => {
+            const taskName = "task02";
+            const tx = await taskBoard.finishTask(taskName, {from: accountWorker});
+            const args = tx.logs.filter(log => log.event === 'TaskFinished')[0].args;
+            assert.equal(web3Utils.toUtf8(args._name), taskName);
+
+            const taskDescription = "task 2 description";
+            const bidPrice = 125;
+            const bidTime = 2 * DAY;
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, bidTime, bidPrice, accountWorker, TASK_FINISHED);
         });
 
 
