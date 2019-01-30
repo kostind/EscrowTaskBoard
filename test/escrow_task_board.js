@@ -118,6 +118,21 @@ contract('Escrow Task Board App', (accounts) => {
             await checkTask(taskBoard, taskName, accountClient, taskDescription, token, DAY, 0, NULL_ADDRESS, TASK_CREATED);
         });
 
+        it('creates third task', async () => {
+            const taskName = "task03";
+            const taskDescription = "task 3 description";
+            const tx = await taskBoard.createTask(taskName, taskDescription, token.address, DAY, {from: accountClient});
+            const args = tx.logs.filter(log => log.event === 'TaskCreated')[0].args;
+
+            assert.equal(web3Utils.toUtf8(args._name), taskName);
+            assert.equal(args._description, taskDescription);
+            assert.equal(args._token, token.address);
+            assert.equal(args._expirationTime, DAY);
+            assert.equal(args._client, accountClient);
+
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, DAY, 0, NULL_ADDRESS, TASK_CREATED);
+        });
+
         it('removes task', async () => {
             const taskName = "task01";
             const tx = await taskBoard.removeTask(taskName, {from: accountClient});
@@ -175,6 +190,7 @@ contract('Escrow Task Board App', (accounts) => {
             await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
 
             const balance = await token.balanceOf.call(taskBoard.address);
+            const clientBalance = await token.balanceOf.call(accountClient);
 
             await token.approve(taskBoard.address, bidPrice, {from: accountClient});
             const tx = await taskBoard.selectBid(taskName, accountWorker, {from: accountClient});
@@ -183,7 +199,9 @@ contract('Escrow Task Board App', (accounts) => {
             assert.equal(args._bidder, accountWorker);
 
             const newBalance = await token.balanceOf.call(taskBoard.address);
+            const newClientBalance = await token.balanceOf.call(accountClient);
             assert.equal(newBalance - balance, bidPrice);
+            assert.equal(clientBalance - newClientBalance, bidPrice);
 
             const taskDescription = "task 2 description";
             await checkTask(taskBoard, taskName, accountClient, taskDescription, token, bidTime, bidPrice, accountWorker, TASK_STARTED);
@@ -202,9 +220,142 @@ contract('Escrow Task Board App', (accounts) => {
             const taskDescription = "task 2 description";
             const bidPrice = 125;
             const bidTime = 2 * DAY;
-            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, bidTime, bidPrice, accountWorker, TASK_FINISHED);
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, 0, bidPrice, accountWorker, TASK_FINISHED);
         });
 
+        it('accepts task by client', async () => {
+            const balance = await token.balanceOf.call(taskBoard.address);
+            const workerBalance = await token.balanceOf.call(accountWorker);
+
+            const taskName = "task02";
+            const bidPrice = 125;
+            const bidTime = 2 * DAY;
+            const tx = await taskBoard.acceptTaskByClient(taskName, {from: accountClient});
+            const args = tx.logs.filter(log => log.event === 'TaskAcceptedByClient')[0].args;
+            assert.equal(web3Utils.toUtf8(args._name), taskName);
+
+            const newBalance = await token.balanceOf.call(taskBoard.address);
+            const newWorkerBalance = await token.balanceOf.call(accountWorker);
+            assert.equal(balance - newBalance, bidPrice);
+            assert.equal(newWorkerBalance - workerBalance, bidPrice);
+
+            const taskDescription = "task 2 description";
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, 0, bidPrice, accountWorker, TASK_ACCEPTED);
+        });
+
+        it('rejects task by client', async () => {
+            const taskName = "task11";
+            const taskDescription = "task 11 description";
+            await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
+
+            const bidPrice = 275;
+            const bidTime = 11 * DAY;
+            const bidDescription = "bid for task 11";
+            await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+
+            await token.approve(taskBoard.address, bidPrice, {from: accountClient});
+            await taskBoard.selectBid(taskName, accountWorker, {from: accountClient});
+
+            await taskBoard.finishTask(taskName, {from: accountWorker});
+
+            const tx = await taskBoard.rejectTaskByClient(taskName, {from: accountClient});
+            const args = tx.logs.filter(log => log.event === 'TaskRejectedByClient')[0].args;
+            assert.equal(web3Utils.toUtf8(args._name), taskName);
+
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, 0, bidPrice, accountWorker, TASK_REJECTED);
+        });
+
+        it('marks task as expired', async () => {
+            const taskName = "task12";
+            const taskDescription = "task 12 description";
+            await taskBoard.createTask(taskName, taskDescription, token.address, DAY, {from: accountClient});
+
+            const bidPrice = 158;
+            const bidTime = 2 * DAY;
+            const bidDescription = "bid for task 12";
+            await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+
+            await token.approve(taskBoard.address, bidPrice, {from: accountClient});
+            await taskBoard.selectBid(taskName, accountWorker, {from: accountClient});
+
+            const balance = await token.balanceOf.call(taskBoard.address);
+            const clientBalance = await token.balanceOf.call(accountClient);
+
+            await timeTravel(bidTime + 1);
+
+            const tx = await taskBoard.markTaskAsExpired(taskName, {from: accountClient});
+            const args = tx.logs.filter(log => log.event === 'TaskExpired')[0].args;
+            assert.equal(web3Utils.toUtf8(args._name), taskName);
+
+            const newBalance = await token.balanceOf.call(taskBoard.address);
+            const newClientBalance = await token.balanceOf.call(accountClient);
+            assert.equal(balance - newBalance, bidPrice);
+            assert.equal(newClientBalance - clientBalance, bidPrice);
+
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, 0, bidPrice, accountWorker, TASK_EXPIRED);
+        });
+
+        it('accepts task by arbiter', async () => {
+            const taskName = "task13";
+            const taskDescription = "task 13 description";
+            await taskBoard.createTask(taskName, taskDescription, token.address, DAY, {from: accountClient});
+
+            const bidPrice = 158;
+            const bidTime = 2 * DAY;
+            const bidDescription = "bid for task 13";
+            await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+
+            await token.approve(taskBoard.address, bidPrice, {from: accountClient});
+            await taskBoard.selectBid(taskName, accountWorker, {from: accountClient});
+
+            await taskBoard.finishTask(taskName, {from: accountWorker});
+            await taskBoard.rejectTaskByClient(taskName, {from: accountClient});
+
+            const balance = await token.balanceOf.call(taskBoard.address);
+            const workerBalance = await token.balanceOf.call(accountWorker);
+
+            const tx = await taskBoard.acceptTaskByArbiter(taskName, {from: root});
+            const args = tx.logs.filter(log => log.event === 'TaskAcceptedByArbiter')[0].args;
+            assert.equal(web3Utils.toUtf8(args._name), taskName);
+
+            const newBalance = await token.balanceOf.call(taskBoard.address);
+            const newWorkerBalance = await token.balanceOf.call(accountWorker);
+            assert.equal(balance - newBalance, bidPrice);
+            assert.equal(newWorkerBalance - workerBalance, bidPrice);
+
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, 0, bidPrice, accountWorker, TASK_ACCEPTED_BY_ARBITER);
+        });
+
+        it('rejects task by arbiter', async () => {
+            const taskName = "task14";
+            const taskDescription = "task 14 description";
+            await taskBoard.createTask(taskName, taskDescription, token.address, DAY, {from: accountClient});
+
+            const bidPrice = 158;
+            const bidTime = 2 * DAY;
+            const bidDescription = "bid for task 14";
+            await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+
+            await token.approve(taskBoard.address, bidPrice, {from: accountClient});
+            await taskBoard.selectBid(taskName, accountWorker, {from: accountClient});
+
+            await taskBoard.finishTask(taskName, {from: accountWorker});
+            await taskBoard.rejectTaskByClient(taskName, {from: accountClient});
+
+            const balance = await token.balanceOf.call(taskBoard.address);
+            const clientBalance = await token.balanceOf.call(accountClient);
+
+            const tx = await taskBoard.rejectTaskByArbiter(taskName, {from: root});
+            const args = tx.logs.filter(log => log.event === 'TaskRejectedByArbiter')[0].args;
+            assert.equal(web3Utils.toUtf8(args._name), taskName);
+
+            const newBalance = await token.balanceOf.call(taskBoard.address);
+            const newClientBalance = await token.balanceOf.call(accountClient);
+            assert.equal(balance - newBalance, bidPrice);
+            assert.equal(newClientBalance - clientBalance, bidPrice);
+
+            await checkTask(taskBoard, taskName, accountClient, taskDescription, token, 0, bidPrice, accountWorker, TASK_REJECTED_BY_ARBITER);
+        });
 
     });
 
@@ -216,7 +367,9 @@ contract('Escrow Task Board App', (accounts) => {
         assert.equal(task[0], client);
         assert.equal(task[1], description);
         assert.equal(task[2], token.address);
-        assert.equal(task[3].toNumber(), now + expiration);
+        if (expiration !== 0) {
+            assert.equal(task[3].toNumber(), now + expiration);
+        }
         assert.equal(task[4], price);
         assert.equal(task[5], worker);
         assert.equal(task[6].toNumber(), state);
