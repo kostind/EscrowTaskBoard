@@ -1,11 +1,7 @@
-const sha3 = require('solidity-sha3').default;
-
 const {assertRevert} = require('@aragon/test-helpers/assertThrow');
 const timeTravel = require('@aragon/test-helpers/timeTravel')(web3);
 const getBlock = require('@aragon/test-helpers/block')(web3);
 const getBlockNumber = require('@aragon/test-helpers/blockNumber')(web3);
-const {encodeCallScript, EMPTY_SCRIPT} = require('@aragon/test-helpers/evmScript');
-// const ExecutionTarget = artifacts.require('ExecutionTarget');
 
 const DAOFactory = artifacts.require('@aragon/os/contracts/factory/DAOFactory');
 const EVMScriptRegistryFactory = artifacts.require('@aragon/os/contracts/factory/EVMScriptRegistryFactory');
@@ -15,10 +11,6 @@ const Kernel = artifacts.require('@aragon/os/contracts/kernel/Kernel');
 const MiniMeToken = artifacts.require('@aragon/apps-shared-minime/contracts/MiniMeToken');
 
 const getContract = name => artifacts.require(name);
-// const bigExp = (x, y) => new web3.BigNumber(x).times(new web3.BigNumber(10).toPower(y));
-// const pct16 = x => bigExp(x, 16);
-// const startVoteEvent = receipt => receipt.logs.filter(x => x.event === 'StartVote')[0].args;
-// const createdVoteId = receipt => startVoteEvent(receipt).voteId;
 
 const Web3 = require('web3');
 const web3Provider = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
@@ -52,7 +44,6 @@ const ERROR_BID_ALREADY_PLACED = "BID_ALREADY_PLACED";
 const ERROR_BID_NOT_FOUND = "BID_NOT_FOUND";
 const ERROR_SELECTED_AS_A_WORKER = "SELECTED_AS_A_WORKER";
 const ERROR_BALANCE_IS_NOT_ENOUGH = "BALANCE_IS_NOT_ENOUGH";
-const ERROR_TRANSFER_FAILED = "TRANSFER_FAILED";
 const ERROR_NOT_A_WORKER = "NOT_A_WORKER";
 const ERROR_TASK_NOT_STARTED = "TASK_NOT_STARTED";
 const ERROR_TASK_NOT_FINISHED = "TASK_NOT_FINISHED";
@@ -60,7 +51,7 @@ const ERROR_TASK_NOT_REJECTED = "TASK_NOT_REJECTED";
 const ERROR_WORKER_STILL_HAS_TIME = "WORKER_STILL_HAS_TIME";
 
 contract('Escrow Task Board App', (accounts) => {
-    let taskBoardBase, daoFact, taskBoard, token, executionTarget;
+    let taskBoardBase, daoFact, taskBoard, token;
 
     let APP_MANAGER_ROLE;
     let ARBITER_ROLE;
@@ -86,7 +77,7 @@ contract('Escrow Task Board App', (accounts) => {
 
         token = await MiniMeToken.new(NULL_ADDRESS, NULL_ADDRESS, 0, 'n', 0, 'n', true); // empty parameters minime
 
-        await token.generateTokens(accountClient, 1000);
+        await token.generateTokens(accountClient, 100000);
 
         const r = await daoFact.newDAO(root);
         const dao = Kernel.at(r.logs.filter(l => l.event === 'DeployDAO')[0].args.dao);
@@ -376,6 +367,310 @@ contract('Escrow Task Board App', (accounts) => {
             assert.equal(newClientBalance - clientBalance, bidPrice);
 
             await checkTask(taskBoard, taskName, accountClient, taskDescription, token, 0, bidPrice, accountWorker, TASK_REJECTED_BY_ARBITER);
+        });
+
+    });
+
+    context('permissions tests', () => {
+
+
+
+    });
+
+    context('negative tests', () => {
+
+        it('creates task - ' + ERROR_INVALID_NAME, async () => {
+            const taskName = "";
+            const taskDescription = "task 31 description";
+            return assertRevert(async () => {
+                await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
+            });
+        });
+
+        it('creates task - ' + ERROR_INVALID_DESCRIPTION, async () => {
+            const taskName = "task 31";
+            const taskDescription = "";
+            return assertRevert(async () => {
+                await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
+            });
+        });
+
+        it('creates task - ' + ERROR_INVALID_TOKEN, async () => {
+            const taskName = "task 31";
+            const taskDescription = "task 31 description";;
+            return assertRevert(async () => {
+                await taskBoard.createTask(taskName, taskDescription, 0, 5 * DAY, {from: accountClient});
+            });
+        });
+
+        it('creates task - ' + ERROR_INVALID_EXPIRATION_TIME, async () => {
+            const taskName = "task 31";
+            const taskDescription = "task 31 description";
+            return assertRevert(async () => {
+                await taskBoard.createTask(taskName, taskDescription, token.address, 60 * 60, {from: accountClient});
+            });
+        });
+
+        it('creates task - ' + ERROR_TASK_ALREADY_EXISTS, async () => {
+            const taskName = "task 31";
+            const taskDescription = "task 31 description";
+            await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
+
+            return assertRevert(async () => {
+                await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
+            });
+        });
+
+        it('remove task - ' + ERROR_TASK_NOT_FOUND, async () => {
+            const taskName = "task 32";
+            return assertRevert(async () => {
+                await taskBoard.removeTask(taskName, {from: accountClient});
+            });
+        });
+
+        it('remove task - ' + ERROR_TASK_ALREADY_STARTED, async () => {
+            const taskName = "task 32";
+            const taskDescription = "task 31 description";
+            await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
+
+            const bidPrice = 158;
+            const bidTime = 2 * DAY;
+            const bidDescription = "bid for task 14";
+            await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+
+            await token.approve(taskBoard.address, bidPrice, {from: accountClient});
+            await taskBoard.selectBid(taskName, accountWorker, {from: accountClient});
+
+            return assertRevert(async () => {
+                await taskBoard.removeTask(taskName, {from: accountClient});
+            });
+        });
+
+        it('place bid - ' + ERROR_TASK_NOT_FOUND, async () => {
+            const taskName = "task 31111";
+            const bidPrice = 158;
+            const bidTime = 2 * DAY;
+            const bidDescription = "bid for task 14";
+            return assertRevert(async () => {
+                await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+            });
+        });
+
+        it('place bid - ' + ERROR_INVALID_PRICE, async () => {
+            const taskName = "task 31";
+            const bidPrice = 0;
+            const bidTime = 2 * DAY;
+            const bidDescription = "bid for task 31";
+            return assertRevert(async () => {
+                await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+            });
+        });
+
+        it('place bid - ' + ERROR_INVALID_DESCRIPTION, async () => {
+            const taskName = "task 31";
+            const bidPrice = 158;
+            const bidTime = 2 * DAY;
+            const bidDescription = "";
+            return assertRevert(async () => {
+                await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+            });
+        });
+
+        it('place bid - ' + ERROR_INVALID_IMPLEMENTATION_TIME, async () => {
+            const taskName = "task 31";
+            const bidPrice = 158;
+            const bidTime = 60 * 60;
+            const bidDescription = "bid for task 31";
+            return assertRevert(async () => {
+                await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+            });
+        });
+
+        it('place bid - ' + ERROR_BID_ALREADY_PLACED, async () => {
+            const taskName = "task 31";
+            const bidPrice = 158;
+            const bidTime = 2 * DAY;
+            const bidDescription = "bid for task 31";
+            await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+            return assertRevert(async () => {
+                await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+            });
+        });
+
+        it('remove bid - ' + ERROR_TASK_NOT_FOUND, async () => {
+            const taskName = "task 31111";
+            return assertRevert(async () => {
+                await taskBoard.removeBid(taskName, {from: accountWorker});
+            });
+        });
+
+        it('remove bid - ' + ERROR_BID_NOT_FOUND, async () => {
+            const taskName = "task 33";
+            const taskDescription = "task 31 description";
+            await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
+
+            return assertRevert(async () => {
+                await taskBoard.removeBid(taskName, {from: accountWorker});
+            });
+        });
+
+        it('remove bid - ' + ERROR_SELECTED_AS_A_WORKER, async () => {
+            const taskName = "task 34";
+            const taskDescription = "task 34 description";
+            await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
+
+            const bidPrice = 275;
+            const bidTime = 11 * DAY;
+            const bidDescription = "bid for task 34";
+            await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+
+            await token.approve(taskBoard.address, bidPrice, {from: accountClient});
+            await taskBoard.selectBid(taskName, accountWorker, {from: accountClient});
+
+            return assertRevert(async () => {
+                await taskBoard.removeBid(taskName, {from: accountWorker});
+            });
+        });
+
+        it('select bid - ' + ERROR_TASK_NOT_FOUND, async () => {
+            const taskName = "task 31111";
+            return assertRevert(async () => {
+                await taskBoard.selectBid(taskName, accountWorker, {from: accountClient});
+            });
+        });
+
+        it('select bid - ' + ERROR_BID_NOT_FOUND, async () => {
+            const taskName = "task 35";
+            const taskDescription = "task 31 description";
+            await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
+
+            return assertRevert(async () => {
+                await taskBoard.selectBid(taskName, accountClient, {from: accountClient});
+            });
+        });
+
+        it('selects bid - ' + ERROR_BALANCE_IS_NOT_ENOUGH, async () => {
+            const taskName = "task 35";
+            const bidDescription = "bid description";
+            const bidPrice = 157000;
+            const bidTime = 2 * DAY;
+            await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+
+            await token.approve(taskBoard.address, bidPrice, {from: accountClient});
+            return assertRevert(async () => {
+                await taskBoard.selectBid(taskName, accountWorker, {from: accountClient});
+            });
+        });
+
+        it('finish task - ' + ERROR_TASK_NOT_FOUND, async () => {
+            const taskName = "task 31111";
+            return assertRevert(async () => {
+                await taskBoard.finishTask(taskName, {from: accountWorker});
+            });
+        });
+
+        it('finish task - ' + ERROR_NOT_A_WORKER, async () => {
+            const taskName = "task 41";
+            const taskDescription = "task 41 description";
+            await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
+
+            return assertRevert(async () => {
+                await taskBoard.finishTask(taskName, {from: accountClient});
+            });
+        });
+
+        it('finish task - ' + ERROR_TASK_NOT_STARTED, async () => {
+            const taskName = "task 41";
+            return assertRevert(async () => {
+                await taskBoard.finishTask(taskName, {from: accountWorker});
+            });
+        });
+
+        it('marks task as expired - ' + ERROR_TASK_NOT_FOUND, async () => {
+            const taskName = "task 31111";
+            return assertRevert(async () => {
+                await taskBoard.markTaskAsExpired(taskName, {from: accountClient});
+            });
+        });
+
+        it('marks task as expired - ' + ERROR_TASK_NOT_STARTED, async () => {
+            const taskName = "task 51";
+            const taskDescription = "task 51 description";
+            await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
+
+            return assertRevert(async () => {
+                await taskBoard.markTaskAsExpired(taskName, {from: accountClient});
+            });
+        });
+
+        it('marks task as expired - ' + ERROR_WORKER_STILL_HAS_TIME, async () => {
+            const taskName = "task 51";
+            const bidPrice = 275;
+            const bidTime = 11 * DAY;
+            const bidDescription = "bid for task 51";
+            await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
+
+            await taskBoard.selectBid(taskName, accountWorker, {from: accountClient});
+
+            return assertRevert(async () => {
+                await taskBoard.markTaskAsExpired(taskName, {from: accountClient});
+            });
+        });
+
+        it('accepts task by client - ' + ERROR_TASK_NOT_FOUND, async () => {
+            const taskName = "task 31111";
+            return assertRevert(async () => {
+                await taskBoard.acceptTaskByClient(taskName, {from: accountClient});
+            });
+        });
+
+        it('accepts task by client - ' + ERROR_TASK_NOT_FINISHED, async () => {
+            const taskName = "task 51";
+            return assertRevert(async () => {
+                await taskBoard.acceptTaskByClient(taskName, {from: accountClient});
+            });
+        });
+
+        it('rejects task by client - ' + ERROR_TASK_NOT_FOUND, async () => {
+            const taskName = "task 31111";
+            return assertRevert(async () => {
+                await taskBoard.rejectTaskByClient(taskName, {from: accountClient});
+            });
+        });
+
+        it('rejects task by client - ' + ERROR_TASK_NOT_FINISHED, async () => {
+            const taskName = "task 51";
+            return assertRevert(async () => {
+                await taskBoard.rejectTaskByClient(taskName, {from: accountClient});
+            });
+        });
+
+        it('accepts task by arbiter - ' + ERROR_TASK_NOT_FOUND, async () => {
+            const taskName = "task 31111";
+            return assertRevert(async () => {
+                await taskBoard.acceptTaskByArbiter(taskName, {from: root});
+            });
+        });
+
+        it('accepts task by arbiter - ' + ERROR_TASK_NOT_REJECTED, async () => {
+            const taskName = "task 51";
+            return assertRevert(async () => {
+                await taskBoard.acceptTaskByArbiter(taskName, {from: root});
+            });
+        });
+
+        it('rejects task by arbiter - ' + ERROR_TASK_NOT_FOUND, async () => {
+            const taskName = "task 31111";
+            return assertRevert(async () => {
+                await taskBoard.rejectTaskByArbiter(taskName, {from: root});
+            });
+        });
+
+        it('rejects task by arbiter - ' + ERROR_TASK_NOT_REJECTED, async () => {
+            const taskName = "task 51";
+            return assertRevert(async () => {
+                await taskBoard.rejectTaskByArbiter(taskName, {from: root});
+            });
         });
 
     });
