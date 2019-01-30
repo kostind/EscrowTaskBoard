@@ -89,12 +89,11 @@ contract('Escrow Task Board App', (accounts) => {
         taskBoard = EscrowTaskBoard.at(receipt.logs.filter(l => l.event === 'NewAppProxy')[0].args.proxy);
         await taskBoard.initialize();
 
-        //TODO ANY_ADDRESS ?
+        //TODO check
         await acl.createPermission(ANY_ADDRESS, taskBoard.address, ARBITER_ROLE, root, {from: root});
     });
 
     beforeEach(async () => {
-        //TODO remove ?
         now = (await getBlock(await getBlockNumber())).timestamp;
     });
 
@@ -373,7 +372,38 @@ contract('Escrow Task Board App', (accounts) => {
 
     context('permissions tests', () => {
 
+        it('removes task', async () => {
+            const taskName = "101";
+            const taskDescription = "task 101 description";
+            await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
+            return assertRevertPermission(async () => {
+                await taskBoard.removeTask(taskName, {from: accountWorker});
+            });
+        });
 
+        it('selects bids', async () => {
+            return assertRevertPermission(async () => {
+                await taskBoard.selectBid("101", accountWorker, {from: accountWorker});
+            });
+        });
+
+        it('marks task as expired', async () => {
+            return assertRevertPermission(async () => {
+                await taskBoard.markTaskAsExpired("101", {from: accountWorker});
+            });
+        });
+
+        it('accepts task by client', async () => {
+            return assertRevertPermission(async () => {
+                await taskBoard.acceptTaskByClient("101", {from: accountWorker});
+            });
+        });
+
+        it('rejects task by client', async () => {
+            return assertRevertPermission(async () => {
+                await taskBoard.rejectTaskByClient("101", {from: accountWorker});
+            });
+        });
 
     });
 
@@ -689,6 +719,23 @@ contract('Escrow Task Board App', (accounts) => {
         assert.equal(task[4], price);
         assert.equal(task[5], worker);
         assert.equal(task[6].toNumber(), state);
+    };
+
+    async function assertRevertPermission(block) {
+        return assertThrows(block, 'Should be reverted - ' + ERROR_IS_NOT_A_CLIENT, ERROR_IS_NOT_A_CLIENT);
+    }
+
+    async function assertThrows(block, message, errorCode) {
+        try {
+            await block()
+        } catch (e) {
+            return assertError(e, errorCode, message)
+        }
+        assert.fail('should have thrown before')
+    }
+
+    function assertError(error, s, message) {
+        assert.isAbove(error.message.search(s), -1, message)
     }
 
 });
