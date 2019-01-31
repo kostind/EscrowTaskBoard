@@ -31,7 +31,6 @@ const TASK_REJECTED_BY_ARBITER = 6;
 const TASK_EXPIRED = 7;
 
 const ERROR_TASK_NOT_FOUND = "TASK_NOT_FOUND";
-const ERROR_IS_NOT_A_CLIENT = "IS_NOT_A_CLIENT";
 const ERROR_INVALID_NAME = "INVALID_NAME";
 const ERROR_INVALID_DESCRIPTION = "INVALID_DESCRIPTION";
 const ERROR_INVALID_TOKEN = "INVALID_TOKEN";
@@ -59,6 +58,7 @@ contract('Escrow Task Board App', (accounts) => {
     const root = accounts[0];
     const accountClient = accounts[1];
     const accountWorker = accounts[2];
+    const accountArbiter = accounts[3];
 
     let now;
 
@@ -89,8 +89,7 @@ contract('Escrow Task Board App', (accounts) => {
         taskBoard = EscrowTaskBoard.at(receipt.logs.filter(l => l.event === 'NewAppProxy')[0].args.proxy);
         await taskBoard.initialize();
 
-        //TODO check
-        await acl.createPermission(ANY_ADDRESS, taskBoard.address, ARBITER_ROLE, root, {from: root});
+        await acl.createPermission(accountArbiter, taskBoard.address, ARBITER_ROLE, accountArbiter, {from: root});
     });
 
     beforeEach(async () => {
@@ -367,7 +366,7 @@ contract('Escrow Task Board App', (accounts) => {
             const balance = await token.balanceOf.call(taskBoard.address);
             const workerBalance = await token.balanceOf.call(accountWorker);
 
-            const tx = await taskBoard.acceptTaskByArbiter(taskName, {from: root});
+            const tx = await taskBoard.acceptTaskByArbiter(taskName, {from: accountArbiter});
             const args = tx.logs.filter(log => log.event === 'TaskAcceptedByArbiter')[0].args;
             assert.equal(web3Utils.toUtf8(args._name), taskName);
 
@@ -398,7 +397,7 @@ contract('Escrow Task Board App', (accounts) => {
             const balance = await token.balanceOf.call(taskBoard.address);
             const clientBalance = await token.balanceOf.call(accountClient);
 
-            const tx = await taskBoard.rejectTaskByArbiter(taskName, {from: root});
+            const tx = await taskBoard.rejectTaskByArbiter(taskName, {from: accountArbiter});
             const args = tx.logs.filter(log => log.event === 'TaskRejectedByArbiter')[0].args;
             assert.equal(web3Utils.toUtf8(args._name), taskName);
 
