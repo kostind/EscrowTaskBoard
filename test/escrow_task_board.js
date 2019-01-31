@@ -18,7 +18,6 @@ const web3Utils = web3Provider.utils;
 
 const EscrowTaskBoard = artifacts.require('EscrowTaskBoard');
 
-const ANY_ADDRESS = '0xffffffffffffffffffffffffffffffffffffffff';
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 const TASK_CREATED = 0;

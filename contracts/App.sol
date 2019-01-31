@@ -3,34 +3,10 @@ pragma solidity ^0.4.24;
 import "@aragon/os/contracts/apps/AragonApp.sol";
 import "@aragon/os/contracts/lib/math/SafeMath.sol";
 
-//TODO add docs
-
 contract EscrowTaskBoard is AragonApp {
     using SafeMath for uint256;
 
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
-
-    //TODO commented because of contract size
-//    string private constant "ERROR_TASK_NOT_FOUND = "TASK_NOT_FOUND";
-//    string private constant "ERROR_IS_NOT_A_CLIENT = "IS_NOT_A_CLIENT";
-//    string private constant "ERROR_INVALID_NAME = "INVALID_NAME";
-//    string private constant "ERROR_INVALID_DESCRIPTION = "INVALID_DESCRIPTION";
-//    string private constant "ERROR_INVALID_TOKEN = "INVALID_TOKEN";
-//    string private constant "ERROR_INVALID_EXPIRATION_TIME = "INVALID_EXPIRATION_TIME";
-//    string private constant "ERROR_TASK_ALREADY_EXISTS = "TASK_ALREADY_EXISTS";
-//    string private constant "ERROR_TASK_ALREADY_STARTED = "TASK_ALREADY_STARTED";
-//    string private constant "ERROR_INVALID_PRICE = "INVALID_PRICE";
-//    string private constant "ERROR_INVALID_IMPLEMENTATION_TIME = "INVALID_IMPLEMENTATION_TIME";
-//    string private constant "ERROR_BID_ALREADY_PLACED = "BID_ALREADY_PLACED";
-//    string private constant "ERROR_BID_NOT_FOUND = "BID_NOT_FOUND";
-//    string private constant "ERROR_SELECTED_AS_A_WORKER = "SELECTED_AS_A_WORKER";
-//    string private constant "ERROR_BALANCE_IS_NOT_ENOUGH = "BALANCE_IS_NOT_ENOUGH";
-//    string private constant "ERROR_TRANSFER_FAILED = "TRANSFER_FAILED";
-//    string private constant "ERROR_NOT_A_WORKER = "NOT_A_WORKER";
-//    string private constant "ERROR_TASK_NOT_STARTED = "TASK_NOT_STARTED";
-//    string private constant "ERROR_TASK_NOT_FINISHED = "TASK_NOT_FINISHED";
-//    string private constant "ERROR_TASK_NOT_REJECTED = "TASK_NOT_REJECTED";
-//    string private constant "ERROR_WORKER_STILL_HAS_TIME = "WORKER_STILL_HAS_TIME";
 
     enum State {
         //task has been created
@@ -106,6 +82,13 @@ contract EscrowTaskBoard is AragonApp {
         initialized();
     }
 
+    /**
+    * @notice Create a new task
+    * @param _name Name of the task
+    * @param _description Description of the task
+    * @param _token Token which will be used for payment
+    * @param _expirationTime Time period for task execution
+    */
     function createTask(bytes32 _name, string _description, address _token, uint256 _expirationTime) external {
         require(_name != bytes32(0), "ERROR_INVALID_NAME");
         require(bytes(_description).length > 0, "ERROR_INVALID_DESCRIPTION");
@@ -128,6 +111,10 @@ contract EscrowTaskBoard is AragonApp {
         emit TaskCreated(_name, _description, _token, _expirationTime, msg.sender);
     }
 
+    /**
+    * @notice Remove given task
+    * @param _name Name of the task
+    */
     function removeTask(bytes32 _name) isExist(_name) isClient(_name) external {
         Task storage task = tasks[_name];
         require(task.state == State.CREATED, "ERROR_TASK_ALREADY_STARTED");
@@ -154,6 +141,13 @@ contract EscrowTaskBoard is AragonApp {
         delete clientTaskIndexes[_client][_name];
     }
 
+    /**
+    * @notice Place bid on the given task
+    * @param _taskName Name of the task
+    * @param _price Price of the task
+    * @param _description Description of the bid
+    * @param _implementationTime Time period for task execution
+    */
     function placeBid(bytes32 _taskName, uint256 _price, string _description, uint256 _implementationTime) external isExist(_taskName)  {
         Task storage task = tasks[_taskName];
         require(_price > 0, "ERROR_INVALID_PRICE");
@@ -172,6 +166,10 @@ contract EscrowTaskBoard is AragonApp {
         emit BidPlaced(_taskName, _price, _description, _implementationTime, msg.sender);
     }
 
+    /**
+    * @notice Remove given bid
+    * @param _taskName Name of the task
+    */
     function removeBid(bytes32 _taskName) external isExist(_taskName) {
         Task storage task = tasks[_taskName];
         require(task.bids[msg.sender].price > 0, "ERROR_BID_NOT_FOUND");
@@ -188,22 +186,31 @@ contract EscrowTaskBoard is AragonApp {
         emit BidRemoved(_taskName, msg.sender);
     }
 
-    function selectBid(bytes32 _taskName, address bidder) external isExist(_taskName) isClient(_taskName) {
+    /**
+    * @notice Select bid made by appropriate bidder
+    * @param _taskName Name of the task
+    * @param _bidder Bidder address
+    */
+    function selectBid(bytes32 _taskName, address _bidder) external isExist(_taskName) isClient(_taskName) {
         Task storage task = tasks[_taskName];
-        require(task.bids[bidder].price > 0, "ERROR_BID_NOT_FOUND");
-        Bid storage bid = task.bids[bidder];
+        require(task.bids[_bidder].price > 0, "ERROR_BID_NOT_FOUND");
+        Bid storage bid = task.bids[_bidder];
         require(ERC20(task.token).balanceOf(msg.sender) >= bid.price, "ERROR_BALANCE_IS_NOT_ENOUGH");
 
-        task.worker = bidder;
+        task.worker = _bidder;
         task.expirationTime = now.add(bid.implementationTime);
         task.state = State.STARTED;
         task.price = bid.price;
-        workerTasks[bidder].push(_taskName);
+        workerTasks[_bidder].push(_taskName);
         require(ERC20(task.token).transferFrom(msg.sender, this, task.price), "ERROR_TRANSFER_FAILED");
 
-        emit BidSelected(_taskName, bidder);
+        emit BidSelected(_taskName, _bidder);
     }
 
+    /**
+    * @notice Finish task
+    * @param _name Name of the task
+    */
     function finishTask(bytes32 _name) external isExist(_name) {
         Task storage task = tasks[_name];
         require(task.worker == msg.sender, "ERROR_NOT_A_WORKER");
@@ -213,6 +220,10 @@ contract EscrowTaskBoard is AragonApp {
         emit TaskFinished(_name);
     }
 
+    /**
+    * @notice Mark task as expired
+    * @param _name Name of the task
+    */
     function markTaskAsExpired(bytes32 _name) external isExist(_name) isClient(_name) {
         Task storage task = tasks[_name];
         require(task.state == State.STARTED, "ERROR_TASK_NOT_STARTED");
@@ -223,6 +234,10 @@ contract EscrowTaskBoard is AragonApp {
         emit TaskExpired(_name);
     }
 
+    /**
+    * @notice Accept task by client
+    * @param _name Name of the task
+    */
     function acceptTaskByClient(bytes32 _name) external isExist(_name) isClient(_name) {
         Task storage task = tasks[_name];
         require(task.state == State.FINISHED, "ERROR_TASK_NOT_FINISHED");
@@ -232,6 +247,10 @@ contract EscrowTaskBoard is AragonApp {
         emit TaskAcceptedByClient(_name);
     }
 
+    /**
+    * @notice Reject task by client
+    * @param _name Name of the task
+    */
     function rejectTaskByClient(bytes32 _name) external isExist(_name) isClient(_name) {
         Task storage task = tasks[_name];
         require(task.state == State.FINISHED, "ERROR_TASK_NOT_FINISHED");
@@ -240,6 +259,10 @@ contract EscrowTaskBoard is AragonApp {
         emit TaskRejectedByClient(_name);
     }
 
+    /**
+    * @notice Accept task by arbiter
+    * @param _name Name of the task
+    */
     function acceptTaskByArbiter(bytes32 _name) external isExist(_name) auth(ARBITER_ROLE) {
         Task storage task = tasks[_name];
         require(task.state == State.REJECTED, "ERROR_TASK_NOT_REJECTED");
@@ -249,6 +272,10 @@ contract EscrowTaskBoard is AragonApp {
         emit TaskAcceptedByArbiter(_name);
     }
 
+    /**
+    * @notice Reject task by arbiter
+    * @param _name Name of the task
+    */
     function rejectTaskByArbiter(bytes32 _name) external isExist(_name) auth(ARBITER_ROLE) {
         Task storage task = tasks[_name];
         require(task.state == State.REJECTED, "ERROR_TASK_NOT_REJECTED");

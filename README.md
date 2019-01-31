@@ -1,21 +1,16 @@
-# Aragon Bare Boilerplate
+# Escrow Task Board
 
-> 🕵️ [Find more boilerplates using GitHub](https://github.com/search?q=topic:aragon-boilerplate) | 
-> ✨ [Official boilerplates](https://github.com/search?q=topic:aragon-boilerplate+org:aragon)
-
-Bare boilerplate for Aragon applications.
-
-This boilerplate *only* includes the contract interfaces and `@aragon/client`, along with the two required application manifests: `manifest.json` and `arapp.json`.
-
-This boilerplate is ideal for building applications that do not use React
-
-## Usage
-
-```sh
-aragon init foo.aragonpm.test bare
-```
-
-## What's in the box?
+Escrow Task Board is a simple board where clients can create tasks. 
+Clients propose ERC20 token for payment. Workers can place bids on the tasks and 
+if they will be selected for task implementation amount of tokens of their bid will be deposited 
+to the task board contract. Task should be finished during implementation time period, 
+otherwise client can mark task as expired and get back his\her tokens. 
+As soon as task finished worker should mark it as finished. Client can accept or reject the task. 
+If client accept the task an appropriate amount of tokens will be sent to the worker address. 
+If client reject the task, arbiter should decide what to do with this task. 
+Arbiter also can accept or reject the task. If arbiter accept the task an appropriate amount of tokens 
+will be sent to the worker address. If arbiter reject the task an appropriate amount of tokens 
+will be sent to the client address.
 
 ### npm Scripts
 
