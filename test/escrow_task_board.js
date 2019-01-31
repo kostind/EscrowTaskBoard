@@ -144,6 +144,13 @@ contract('Escrow Task Board App', (accounts) => {
             await checkTask(taskBoard, taskName, accountClient, taskDescription, token, DAY, 0, NULL_ADDRESS, TASK_CREATED);
         });
 
+        it('fails to remove task', async () => {
+            const taskName = "task01";
+            return assertRevert(async () => {
+                await taskBoard.removeTask(taskName, {from: accountWorker});
+            });
+        });
+
         it('removes task', async () => {
             const taskName = "task01";
             const tx = await taskBoard.removeTask(taskName, {from: accountClient});
@@ -193,13 +200,22 @@ contract('Escrow Task Board App', (accounts) => {
             });
         });
 
-        it('selects bid', async () => {
+        it('fails to selects bid', async () => {
             const taskName = "task02";
             const bidDescription = "bid description";
             const bidPrice = 125;
             const bidTime = 2 * DAY;
             await taskBoard.placeBid(taskName, bidPrice, bidDescription, bidTime, {from: accountWorker});
 
+            return assertRevert(async () => {
+                await taskBoard.selectBid(taskName, accountWorker, {from: accountWorker});
+            });
+        });
+
+        it('selects bid', async () => {
+            const taskName = "task02";
+            const bidPrice = 125;
+            const bidTime = 2 * DAY;
             const balance = await token.balanceOf.call(taskBoard.address);
             const clientBalance = await token.balanceOf.call(accountClient);
 
@@ -234,13 +250,19 @@ contract('Escrow Task Board App', (accounts) => {
             await checkTask(taskBoard, taskName, accountClient, taskDescription, token, 0, bidPrice, accountWorker, TASK_FINISHED);
         });
 
+        it('fails to accept task by client', async () => {
+            const taskName = "task02";
+            return assertRevert(async () => {
+                await taskBoard.acceptTaskByClient(taskName, {from: accountWorker});
+            });
+        });
+
         it('accepts task by client', async () => {
             const balance = await token.balanceOf.call(taskBoard.address);
             const workerBalance = await token.balanceOf.call(accountWorker);
 
             const taskName = "task02";
             const bidPrice = 125;
-            const bidTime = 2 * DAY;
             const tx = await taskBoard.acceptTaskByClient(taskName, {from: accountClient});
             const args = tx.logs.filter(log => log.event === 'TaskAcceptedByClient')[0].args;
             assert.equal(web3Utils.toUtf8(args._name), taskName);
@@ -254,7 +276,7 @@ contract('Escrow Task Board App', (accounts) => {
             await checkTask(taskBoard, taskName, accountClient, taskDescription, token, 0, bidPrice, accountWorker, TASK_ACCEPTED);
         });
 
-        it('rejects task by client', async () => {
+        it('fails to reject task by client', async () => {
             const taskName = "task11";
             const taskDescription = "task 11 description";
             await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
@@ -269,6 +291,16 @@ contract('Escrow Task Board App', (accounts) => {
 
             await taskBoard.finishTask(taskName, {from: accountWorker});
 
+            return assertRevert(async () => {
+                await taskBoard.rejectTaskByClient(taskName, {from: accountWorker});
+            });
+        });
+
+        it('rejects task by client', async () => {
+            const taskName = "task11";
+            const taskDescription = "task 11 description";
+            const bidPrice = 275;
+
             const tx = await taskBoard.rejectTaskByClient(taskName, {from: accountClient});
             const args = tx.logs.filter(log => log.event === 'TaskRejectedByClient')[0].args;
             assert.equal(web3Utils.toUtf8(args._name), taskName);
@@ -276,7 +308,7 @@ contract('Escrow Task Board App', (accounts) => {
             await checkTask(taskBoard, taskName, accountClient, taskDescription, token, 0, bidPrice, accountWorker, TASK_REJECTED);
         });
 
-        it('marks task as expired', async () => {
+        it('fails to marks task as expired', async () => {
             const taskName = "task12";
             const taskDescription = "task 12 description";
             await taskBoard.createTask(taskName, taskDescription, token.address, DAY, {from: accountClient});
@@ -289,10 +321,20 @@ contract('Escrow Task Board App', (accounts) => {
             await token.approve(taskBoard.address, bidPrice, {from: accountClient});
             await taskBoard.selectBid(taskName, accountWorker, {from: accountClient});
 
+            await timeTravel(bidTime + 1);
+
+            return assertRevert(async () => {
+                await taskBoard.markTaskAsExpired(taskName, {from: accountWorker});
+            });
+        });
+
+        it('marks task as expired', async () => {
+            const taskName = "task12";
+            const taskDescription = "task 12 description";
+            const bidPrice = 158;
+
             const balance = await token.balanceOf.call(taskBoard.address);
             const clientBalance = await token.balanceOf.call(accountClient);
-
-            await timeTravel(bidTime + 1);
 
             const tx = await taskBoard.markTaskAsExpired(taskName, {from: accountClient});
             const args = tx.logs.filter(log => log.event === 'TaskExpired')[0].args;
@@ -366,43 +408,6 @@ contract('Escrow Task Board App', (accounts) => {
             assert.equal(newClientBalance - clientBalance, bidPrice);
 
             await checkTask(taskBoard, taskName, accountClient, taskDescription, token, 0, bidPrice, accountWorker, TASK_REJECTED_BY_ARBITER);
-        });
-
-    });
-
-    context('permissions tests', () => {
-
-        it('removes task', async () => {
-            const taskName = "101";
-            const taskDescription = "task 101 description";
-            await taskBoard.createTask(taskName, taskDescription, token.address, 5 * DAY, {from: accountClient});
-            return assertRevertPermission(async () => {
-                await taskBoard.removeTask(taskName, {from: accountWorker});
-            });
-        });
-
-        it('selects bids', async () => {
-            return assertRevertPermission(async () => {
-                await taskBoard.selectBid("101", accountWorker, {from: accountWorker});
-            });
-        });
-
-        it('marks task as expired', async () => {
-            return assertRevertPermission(async () => {
-                await taskBoard.markTaskAsExpired("101", {from: accountWorker});
-            });
-        });
-
-        it('accepts task by client', async () => {
-            return assertRevertPermission(async () => {
-                await taskBoard.acceptTaskByClient("101", {from: accountWorker});
-            });
-        });
-
-        it('rejects task by client', async () => {
-            return assertRevertPermission(async () => {
-                await taskBoard.rejectTaskByClient("101", {from: accountWorker});
-            });
         });
 
     });
@@ -720,22 +725,5 @@ contract('Escrow Task Board App', (accounts) => {
         assert.equal(task[5], worker);
         assert.equal(task[6].toNumber(), state);
     };
-
-    async function assertRevertPermission(block) {
-        return assertThrows(block, 'Should be reverted - ' + ERROR_IS_NOT_A_CLIENT, ERROR_IS_NOT_A_CLIENT);
-    }
-
-    async function assertThrows(block, message, errorCode) {
-        try {
-            await block()
-        } catch (e) {
-            return assertError(e, errorCode, message)
-        }
-        assert.fail('should have thrown before')
-    }
-
-    function assertError(error, s, message) {
-        assert.isAbove(error.message.search(s), -1, message)
-    }
 
 });
